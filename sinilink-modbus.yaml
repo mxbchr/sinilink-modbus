@@ -1,18 +1,29 @@
 substitutions:
   # Change this model to fit your particular one.
   # You can find it in Home Assistant as the device diagnostic "Model Name".
-  model: "XY5008"
-  device_name: "xy5008-controller"
-  device_friendly_name: "sinilink-XY5008"
+  model: "XY6509X" #"XY5008"
+  device_name: "${model}-controller"
+  device_friendly_name: "sinilink-${model}"
   device_description: "Power Supply"
   
   # Model specific settings (Don't change these!)
+  # XY5008
   XY5008_voltage_maximum: "50"
   XY5008_voltage_accuracy: "2"
   XY5008_voltage_multiplier: "0.01"
   XY5008_current_maximum: "8"
   XY5008_current_accuracy: "3"
   XY5008_current_multiplier: "0.001"
+  # XY6509X
+  XY6509X_voltage_maximum: "65"
+  XY6509X_voltage_accuracy: "2"
+  XY6509X_voltage_multiplier: "0.01"
+  XY6509X_current_maximum: "9"
+  XY6509X_current_accuracy: "3"
+  XY6509X_current_multiplier: "0.001"
+  XY6509X_current_maximum: "585"
+  # Documentation for XY6509X here: https://www.mikrocontroller.net/attachment/641206/Powermodule_XY-SK60_Mosbus_protocol_english.pdf
+  
 
 globals:
    - id:   vin_undervoltage_theshold
@@ -26,7 +37,7 @@ esphome:
   comment: $device_description
   name_add_mac_suffix: false
   project:
-    name: "sinilink.xy5008-controller"
+    name: "sinilink.${devicename}"
     version: "1.0.0"
 
 esp8266:
@@ -69,7 +80,7 @@ wifi:
 
   # Enable fallback hotspot (captive portal) in case wifi connection fails
   ap:
-    ssid: "XY5008 Fallback Hotspot"
+    ssid: "${devicename} Fallback Hotspot"
     password: ""
 
 text_sensor:
@@ -86,11 +97,29 @@ text_sensor:
     lambda: |-
       char buffer[16];
       std::string ton_time;
-      std::snprintf(buffer, 16, "%02d:%02d:%02d" , (int)id(turnon_hours).state, (int)id(turnon_minutes).state, (int)id(turnon_seconds).state);
+      std::snprintf(buffer, 16, "%02d:%02d:%02d" , (int)id(OUT_H).state, (int)id(OUT_M).state, (int)id(OUT_S).state);
       ton_time = buffer;
       
       return {ton_time};
     update_interval: 1s
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 22
+    name: "Model"
+    id: "MODEL"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 23
+    name: "Firmware"
+    id: "VERSION"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
           
 interval:
   - interval: 5s
@@ -139,7 +168,7 @@ interval:
           static int delay_count = 0;
           static int uv_count = 0;
                     
-          if ((id(output_switch).state) && (id(cutoff_current).state!=0) && (id(output_current).state < id(cutoff_current).state)){
+          if ((id(output_switch).state) && (id(cutoff_current).state!=0) && (id(IOUT).state < id(cutoff_current).state)){
             if (count>=5) {
               count = 0;
               id(output_switch).turn_off();
@@ -149,7 +178,7 @@ interval:
           }
           else count=0;
           
-          if (id(input_voltage).state < id(vin_undervoltage_theshold)) { if (uv_count<4) uv_count++; }
+          if (id(UIN).state < id(vin_undervoltage_theshold)) { if (uv_count<4) uv_count++; }
           else {
              if (id(output_switch).state) id(out_relay).turn_on();
              uv_count=0;
@@ -201,6 +230,7 @@ sensor:
     modbus_controller_id: powersupply
     address: 2
     name: "Output voltage"
+    id: "VOUT" # Output voltage display value
     device_class: voltage
     state_class: measurement
     unit_of_measurement: "V"
@@ -214,7 +244,7 @@ sensor:
     modbus_controller_id: powersupply
     address: 3
     name: "Output current"
-    id: output_current
+    id: "IOUT" # Output current display value
     device_class: current
     state_class: measurement
     unit_of_measurement: "A"
@@ -228,6 +258,7 @@ sensor:
     modbus_controller_id: powersupply
     address: 4
     name: "Output Power"
+    id: "POWER" # Output power display value
     device_class: power
     state_class: measurement
     unit_of_measurement: "W"
@@ -241,7 +272,7 @@ sensor:
     modbus_controller_id: powersupply
     address: 5
     name: "Input voltage"
-    id: input_voltage
+    id: "UIN" # Input voltage display value
     device_class: voltage
     unit_of_measurement: "V"
     register_type: holding
@@ -249,89 +280,123 @@ sensor:
     accuracy_decimals: ${${model}_voltage_accuracy}
     #accuracy_decimals: 3
     filters:
-    #  - multiply: ${${model}_voltage_multiplier}
-      - multiply: 0.01
+      - multiply: ${${model}_voltage_multiplier}
+    #  - multiply: 0.01
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 6
-    name: "Battery charge"
-    device_class: "energy_storage"
+    name: "unknown-AH-LOW" #"Battery charge"
+    id: "AH-LOW" # Output AH Low 16-bit output
+    #device_class: "energy_storage"
     state_class: measurement
     unit_of_measurement: "Ah"
-    icon: "mdi:battery-60"
+    #icon: "mdi:battery-60"
     register_type: holding
     value_type: U_DWORD_R
-    accuracy_decimals: 3
-    filters:
-      - multiply: 0.001
+    #accuracy_decimals: 3
+    #filters:
+    #  - multiply: 0.001
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 7
+    name: "unknown-AH-HIGH" #"Battery charge"
+    id: "AH-HIGH" # AH High 16-bit output
+    #device_class: "energy_storage"
+    state_class: measurement
+    unit_of_measurement: "Ah"
+    #icon: "mdi:battery-60"
+    register_type: holding
+    value_type: U_DWORD_R
+    #accuracy_decimals: 3
+    #filters:
+    #  - multiply: 0.001
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 8
-    name: "Battery energy"
-    device_class: "energy_storage"
+    name: "unknown-WH-LOW" #"Battery charge"
+    id: "WH-LOW" # WH Low 16-bit output
+    #device_class: "energy_storage"
     state_class: measurement
     unit_of_measurement: "Wh"
-    icon: "mdi:battery-60"
+    #icon: "mdi:battery-60"
     register_type: holding
     value_type: U_DWORD_R
-    accuracy_decimals: 3
-    filters:
-      - multiply: 0.001
+    #accuracy_decimals: 3
+    #filters:
+    #  - multiply: 0.001
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 9
+    name: "unknown-WH-HIGH" #"Battery charge"
+    id: "WH-HIGH" # WH High 16-bit output
+    #device_class: "energy_storage"
+    state_class: measurement
+    unit_of_measurement: "Wh"
+    #icon: "mdi:battery-60"
+    register_type: holding
+    value_type: U_DWORD_R
+    #accuracy_decimals: 3
+    #filters:
+    #  - multiply: 0.001
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 10
-    name: "turnon_hours"
-    id: turnon_hours
+    name: "Output Hours"
+    id: "OUT_H" # "Output Hours"
     unit_of_measurement: "hours"
     register_type: holding
     value_type: U_WORD
-    internal: true
+    #internal: true
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 11
-    name: "turnon_minutes"
-    id: turnon_minutes
+    name: "Output Minutes"
+    id: "OUT_M" #"Output Minutes"
     unit_of_measurement: "minutes"
     register_type: holding
     value_type: U_WORD
-    internal: true
+    #internal: true
   
   - platform: modbus_controller
     modbus_controller_id: powersupply
     address: 12
-    name: "turnon_seconds"
-    id: turnon_seconds
+    name: "Output Seconds"
+    id: "OUT_S" #"Output Seconds"
     unit_of_measurement: "seconds"
     register_type: holding
     value_type: U_WORD
-    internal: true
+    #internal: true
     
   - platform: modbus_controller
-    name: "Temperature"
+    name: "System Temperature"
+    id: "T_IN" 
     device_class: temperature
     state_class: measurement
     modbus_controller_id: powersupply
     register_type: holding
     address: 13
     value_type: S_WORD
-    unit_of_measurement: "°C"
+    unit_of_measurement: "°C" # "°F"
     accuracy_decimals: 1
     filters:
       - multiply: 0.1
     
   - platform: modbus_controller
-    name: "Temperature external"
+    name: "External Temperature"
+    id: "T_EX"
     state_class: measurement
     modbus_controller_id: powersupply
     register_type: holding
     address: 14
     value_type: S_WORD
     device_class: temperature
-    unit_of_measurement: "°C"
+    unit_of_measurement: "°C" # "°F"
     accuracy_decimals: 1
     filters:
       - multiply: 0.1
@@ -343,13 +408,14 @@ sensor:
     register_type: holding
     address: 48
     value_type: U_WORD
-    internal: true
+    #internal: true
        
 binary_sensor:
  
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Constant Voltage"
+    id: "CVCC-CV"
     address: 17
     register_type: holding
     bitmask: 0x1
@@ -359,6 +425,7 @@ binary_sensor:
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Constant Current"
+    id: "CVCC-CC"
     address: 17
     register_type: holding
     bitmask: 0x1 
@@ -405,16 +472,218 @@ number:
     max_value: ${${model}_current_maximum}
     step: ${${model}_current_multiplier}
     optimistic: true
-    
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Backlight"
+    id: "B-LED"
+    #device_class: current
+    unit_of_measurement: "(0-5)"
+    entity_category: config
+    mode: slider
+    address: 20
+    value_type: U_WORD
+    min_value: 0
+    max_value: 5
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "SleepTime"
+    id: "SLEEP"
+    #device_class: current
+    unit_of_measurement: "min"
+    entity_category: config
+    mode: slider
+    address: 21
+    value_type: U_WORD
+    min_value: 0
+    max_value: 65535 #????
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Slave Address"
+    id: "SLAVE-ADD"
+    device_class: data_rate
+    #unit_of_measurement: "min"
+    entity_category: config
+    mode: box
+    address: 24
+    value_type: U_WORD
+    min_value: 0
+    max_value: 65535 #????
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Baudrate"
+    id: "BAUDRATE_L"
+    #device_class: current
+    unit_of_measurement: "bps"
+    entity_category: config
+    mode: box
+    address: 25
+    value_type: U_WORD
+    min_value: 0
+    max_value: 8
+    #Note 1: (0019H) Baud rate register meaning 0:9600 1:14400 2:19200 3:38400 4:56000 5:576000 6:115200 (7:2400 8:4800 supported by some devices
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Internal Temperature Offset"
+    id: "T-IN-OFFSET"
+    entity_category: config
+    mode: box
+    address: 26
+    value_type: U_WORD
+    min_value: 0
+    max_value: 65535
+    step: 0.1
+    lambda: !lambda return x * 0.1;
+    write_lambda: !lambda return x * (1/0.1);
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "External Temperature Offset"
+    id: "T-EX-OFFSET"
+    entity_category: config
+    mode: box
+    address: 27
+    value_type: U_WORD
+    min_value: 0
+    max_value: 6553.5
+    step: 0.1
+    lambda: !lambda return x * 0.1;
+    write_lambda: !lambda return x * (1/0.1);
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Quick Recall Data Groups"
+    id: "EXTRACT-M"
+    #device_class: current
+    #unit_of_measurement: "bps"
+    entity_category: config
+    mode: slider
+    address: 29
+    value_type: U_WORD
+    min_value: 0
+    max_value: 9 #????
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Full Power cut-off Current???"
+    id: "BatFul"
+    device_class: current
+    unit_of_measurement: "A"
+    entity_category: config
+    mode: box
+    address: 33
+    value_type: U_WORD
+    min_value: 0
+    max_value: ${${model}_current_maximum}
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Constant Power Value"
+    id: "CW"
+    device_class: current
+    unit_of_measurement: "W"
+    entity_category: config
+    mode: box
+    address: 35
+    value_type: U_WORD
+    min_value: 0
+    max_value: ${${model}_power_maximum}
+    step: 1
+
 switch:
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Key Lock"
+    id: "LOCK"
+    address: 15
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Protection Status"
+    id: "PROTECT"
+    address: 16
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
   - platform: modbus_controller
     modbus_controller_id: powersupply
     name: "Output"
-    id: output_switch
+    id: "ONOFF"
     address: 18
     register_type: holding
     bitmask: 0x1
     entity_category: config
+    
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Temperature Symbol (on=F/off=C)"
+    id: "FC"
+    address: 19
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Buzzer"
+    id: "Buzzer"
+    address: 28
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Device Status"
+    id: "DEVICE"
+    address: 30
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "MPPT Switch"
+    id: "MPPT-SW"
+    address: 31
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+    inverted: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "MPPT Coefficient"
+    id: "MPPT-K"
+    address: 32
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Constant Power Switch"
+    id: "CW-SW"
+    address: 34
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+    inverted: true
    
   - platform: gpio
     id: out_relay
