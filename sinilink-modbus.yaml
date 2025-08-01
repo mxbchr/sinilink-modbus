@@ -105,6 +105,30 @@ text_sensor:
 
   - platform: modbus_controller
     modbus_controller_id: powersupply
+    name: "Protection Status"
+    id: "PROTECT"
+    address: 16
+    register_type: holding
+    value_type: U_WORD
+    bitmask: 0x1
+    #entity_category: config
+    filters:
+      - map:
+        - 0 -> Normal
+        - 1 -> OVP over voltage protection
+        - 2 -> OCP over current protection
+        - 3 -> OPP output over power protection
+        - 4 -> LVP input undervoltage protection
+        - 5 -> OAH over capacity protection
+        - 6 -> OHP overtime protection
+        - 7 -> OTP over termperature protection
+        - 8 -> OEP no output protection
+        - 9 -> OWH over energy protection
+        - 10 -> ICP over input current protection
+        - 11 -> ETP external temperature protection
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
     address: 22
     name: "Model"
     id: "MODEL"
@@ -120,7 +144,67 @@ text_sensor:
     register_type: holding
     value_type: U_WORD
     #internal: true
-          
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 48
+    name: "Host Type"
+    id: "MASTER"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+    filters:
+      - map:
+        - 0x3B3A -> WiFi
+        
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 49
+    name: "Wifi Configuration"
+    id: "WIFI-CONFIG"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+    filters:
+      - map:
+        - 0 -> Invalid 
+        - 1 -> Station Mode
+        - 2 -> AP Mode
+  
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 50
+    name: "Wifi Status"
+    id: "WIFI-STATUS"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+    filters:
+      - map:
+        - 0 -> Invalid Network
+        - 1 -> Station Connectec
+        - 2 -> AP Connected
+        - 3 -> Station Connecting...
+        - 4 -> AP Connecting...
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 51
+    name: "IP4 First Two bytes"
+    id: "IP4-H"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    address: 52
+    name: "IP4 Last Two bytes"
+    id: "IP4-L"
+    register_type: holding
+    value_type: U_WORD
+    #internal: true
+
 interval:
   - interval: 5s
     then:
@@ -401,13 +485,13 @@ sensor:
     filters:
       - multiply: 0.1
       
-  - platform: modbus_controller
-    name: "Host type"
-    state_class: measurement
-    modbus_controller_id: powersupply
-    register_type: holding
-    address: 48
-    value_type: U_WORD
+#  - platform: modbus_controller
+#    name: "Host type"
+#    state_class: measurement
+#    modbus_controller_id: powersupply
+#    register_type: holding
+#    address: 48
+#    value_type: U_WORD
     #internal: true
        
 binary_sensor:
@@ -600,6 +684,212 @@ number:
     max_value: ${${model}_power_maximum}
     step: 1
 
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Voltage Setting"
+    id: "V-SET-2"
+    device_class: voltage
+    unit_of_measurement: "V"
+    entity_category: config
+    mode: box
+    address: 80
+    value_type: U_WORD
+    min_value: 0
+    max_value: ${${model}_voltage_maximum}
+    step: ${${model}_voltage_multiplier}
+    lambda: !lambda return x * ${${model}_voltage_multiplier};
+    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Current Setting"
+    id: "I-SET-2"
+    device_class: current
+    unit_of_measurement: "A"
+    entity_category: config
+    mode: box
+    address: 81
+    value_type: U_WORD
+    min_value: 0
+    max_value: ${${model}_current_maximum}
+    step: ${${model}_current_multiplier}
+    lambda: !lambda return x * ${${model}_current_multiplier};
+    write_lambda: !lambda return x * (1/${${model}_current_multiplier});
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Input Undervoltage Protection"
+    id: "S-LVP"
+    device_class: voltage
+    unit_of_measurement: "V"
+    entity_category: config
+    mode: box
+    address: 82
+    value_type: U_WORD
+    min_value: 10
+    max_value: 75
+    step: ${${model}_voltage_multiplier}
+    lambda: !lambda return x * ${${model}_voltage_multiplier};
+    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Over Voltage Protection"
+    id: "S-OVP"
+    device_class: voltage
+    unit_of_measurement: "V"
+    entity_category: config
+    mode: box
+    address: 83
+    value_type: U_WORD
+    min_value: 0
+    max_value: 67
+    step: ${${model}_voltage_multiplier}
+    lambda: !lambda return x * ${${model}_voltage_multiplier};
+    write_lambda: !lambda return x * (1/${${model}_voltage_multiplier});
+    
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Overcurrent Protection"
+    id: "S-OCP"
+    device_class: current
+    unit_of_measurement: "A"
+    entity_category: config
+    mode: box
+    address: 84
+    value_type: U_WORD
+    min_value: 0
+    max_value: 9.2
+    step: ${${model}_current_multiplier}
+    lambda: !lambda return x * ${${model}_current_multiplier};
+    write_lambda: !lambda return x * (1/${${model}_current_multiplier});
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Overpower Protection"
+    id: "S-OPP"
+    device_class: power
+    unit_of_measurement: "W"
+    entity_category: config
+    mode: box
+    address: 85
+    value_type: U_WORD
+    min_value: 0
+    max_value: 650
+    step: 0.1
+    lambda: !lambda return x * 0.1;
+    write_lambda: !lambda return x * (1/0.1);
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Output Duration Hours"
+    id: "S-OHP_H"
+    unit_of_measurement: "h"
+    entity_category: config
+    mode: box
+    address: 86
+    value_type: U_WORD
+    min_value: 0
+    max_value: 99
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Output Duration Minutes"
+    id: "S-OHP_M"
+    unit_of_measurement: "m"
+    entity_category: config
+    mode: box
+    address: 87
+    value_type: U_WORD
+    min_value: 0
+    max_value: 59
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Capacity low 16 bit"
+    id: "S-OHA_L"
+    unit_of_measurement: "Ah"
+    entity_category: config
+    device_class: current
+    mode: box
+    address: 89
+    value_type: U_WORD
+    min_value: 0
+    #max_value: 99
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Capacity high 16 bit"
+    id: "S-OHA_H"
+    unit_of_measurement: "Ah"
+    entity_category: config
+    device_class: current
+    mode: box
+    address: 90
+    value_type: U_WORD
+    min_value: 0
+    #max_value: 99
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Power low 16 bit"
+    id: "S-OWH_L"
+    unit_of_measurement: "Wh"
+    entity_category: config
+    device_class: power
+    mode: box
+    address: 90
+    value_type: U_WORD
+    min_value: 0
+    #max_value: 99
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Power high 16 bit"
+    id: "S-OWH_H"
+    unit_of_measurement: "Wh"
+    entity_category: config
+    device_class: power
+    mode: box
+    address: 91
+    value_type: U_WORD
+    min_value: 0
+    #max_value: 99
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum Internal Temperature"
+    id: "S-OTP"
+    unit_of_measurement: "°C"
+    entity_category: config
+    device_class: temperature
+    mode: box
+    address: 92
+    value_type: U_WORD
+    min_value: 0
+    max_value: 110
+    step: 1
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Maximum External Temperature"
+    id: "S-ETP"
+    unit_of_measurement: "°C"
+    entity_category: config
+    device_class: temperature
+    mode: box
+    address: 94
+    value_type: U_WORD
+    min_value: 0
+    max_value: 110
+    step: 1
+
 switch:
 
   - platform: modbus_controller
@@ -607,15 +897,6 @@ switch:
     name: "Key Lock"
     id: "LOCK"
     address: 15
-    register_type: holding
-    bitmask: 0x1
-    entity_category: config
-
-  - platform: modbus_controller
-    modbus_controller_id: powersupply
-    name: "Protection Status"
-    id: "PROTECT"
-    address: 16
     register_type: holding
     bitmask: 0x1
     entity_category: config
@@ -680,6 +961,16 @@ switch:
     name: "Constant Power Switch"
     id: "CW-SW"
     address: 34
+    register_type: holding
+    bitmask: 0x1
+    entity_category: config
+    inverted: true
+
+  - platform: modbus_controller
+    modbus_controller_id: powersupply
+    name: "Power Output Switch"
+    id: "S-INI"
+    address: 93
     register_type: holding
     bitmask: 0x1
     entity_category: config
